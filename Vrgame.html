@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quest 3S VR Target Practice</title>
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    
+    <script>
+        // Custom component for the target logic
+        AFRAME.registerComponent('target', {
+            init: function () {
+                let el = this.el;
+                
+                // When the target is clicked/shot
+                el.addEventListener('click', function () {
+                    // 1. Update the score
+                    let scoreText = document.querySelector('#scoreText');
+                    let currentScore = parseInt(scoreText.getAttribute('text').value.replace('SCORE: ', ''));
+                    let newScore = currentScore + 1;
+                    scoreText.setAttribute('text', 'value', 'SCORE: ' + newScore);
+
+                    // 2. Teleport the target to a new random location
+                    let newX = (Math.random() - 0.5) * 8; // Random X between -4 and 4
+                    let newY = Math.random() * 3 + 1;     // Random Y between 1 and 4
+                    let newZ = -(Math.random() * 5 + 2);  // Random Z between -2 and -7
+                    
+                    el.setAttribute('position', {x: newX, y: newY, z: newZ});
+                    
+                    // 3. Temporarily change color to show it was hit
+                    el.setAttribute('color', '#00ff00');
+                    setTimeout(() => {
+                        el.setAttribute('color', '#ff0033');
+                    }, 150);
+                });
+            }
+        });
+    </script>
+</head>
+<body>
+    <a-scene>
+        <a-assets>
+            <img id="grid" src="https://cdn.aframe.io/a-painter/images/floor.jpg" crossorigin="anonymous">
+        </a-assets>
+
+        <a-sky color="#0d0d1a"></a-sky>
+        <a-plane src="#grid" position="0 0 -4" rotation="-90 0 0" width="20" height="20" repeat="10 10"></a-plane>
+
+        <a-light type="ambient" color="#445451"></a-light>
+        <a-light type="point" intensity="1.5" position="2 4 4"></a-light>
+
+        <a-entity position="0 4 -4" 
+                  geometry="primitive: plane; width: 3; height: 1" 
+                  material="color: #222; opacity: 0.8">
+            <a-text id="scoreText" value="SCORE: 0" align="center" position="0 0 0.1" color="#00d2ff" width="6" font="mozillavr"></a-text>
+        </a-entity>
+
+        <a-box target position="0 1.5 -3" color="#ff0033" 
+               animation="property: rotation; to: 360 360 0; loop: true; dur: 3000; easing: linear"
+               animation__scale="property: scale; dir: alternate; to: 1.2 1.2 1.2; loop: true; dur: 1000"
+               class="clickable">
+        </a-box>
+
+        <a-entity id="rig">
+            <a-camera position="0 1.6 0">
+                <a-cursor color="#00ff00" raycaster="objects: .clickable"></a-cursor>
+            </a-camera>
+
+            <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 20"></a-entity>
+            <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 20"></a-entity>
+        </a-entity>
+    </a-scene>
+</body>
+</html>
