@@ -7,6 +7,41 @@
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     
     <script>
+        // Web Audio API Setup for Sound Effects (No external files needed)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            // Resume context if suspended (browser security feature)
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'hit') {
+                // Retro laser/zap sound for a correct hit
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            } else if (type === 'fail') {
+                // Low buzz sound for a wrong color hit
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
+
         // Custom component for the target logic
         AFRAME.registerComponent('target', {
             schema: {
@@ -17,42 +52,32 @@
                 let data = this.data;
                 
                 el.addEventListener('click', function (evt) {
-                    // Get the ID of the controller that shot the target
-                    let intersection = evt.detail.intersection;
                     let raycasterEl = evt.detail.cursorEl; 
                     let controllerId = raycasterEl.getAttribute('id');
                     
                     let scoreText = document.querySelector('#scoreText');
                     let currentScore = parseInt(scoreText.getAttribute('text').value.replace('SCORE: ', ''));
                     
-                    // Check if the correct gun shot the correct target
                     let isCorrectHit = false;
                     if (data.colorType === 'red' && controllerId === 'leftHand') isCorrectHit = true;
                     if (data.colorType === 'blue' && controllerId === 'rightHand') isCorrectHit = true;
-                    
-                    // Also allow desktop cursor click for testing
-                    if (!controllerId) isCorrectHit = true; 
+                    if (!controllerId) isCorrectHit = true; // Desktop fallback
 
                     if (isCorrectHit) {
-                        // Correct Hit: Level Up Score!
                         currentScore += 1;
                         scoreText.setAttribute('text', 'value', 'SCORE: ' + currentScore);
-                        
-                        // Flash green briefly on success
                         el.setAttribute('material', 'color', '#00ff00');
+                        playSound('hit'); // Play correct hit sound
                     } else {
-                        // Wrong Gun: Reset Score!
                         currentScore = 0;
                         scoreText.setAttribute('text', 'value', 'SCORE: WRONG COLOR!');
+                        playSound('fail'); // Play wrong color buzz sound
                         setTimeout(() => {
                             scoreText.setAttribute('text', 'value', 'SCORE: 0');
                         }, 1000);
-                        
-                        // Flash white on failure
                         el.setAttribute('material', 'color', '#ffffff');
                     }
 
-                    // Move target to a brand new 360-degree random location after being hit
                     setTimeout(() => {
                         respawnTarget(el);
                     }, 200);
@@ -60,18 +85,15 @@
             }
         });
 
-        // Helper function to spawn targets anywhere in a 360 radius around the player
         function respawnTarget(el) {
-            // Pick random angle around the player (0 to 360 degrees)
             let angle = Math.random() * Math.PI * 2;
-            // Distance from player (between 3 and 6 meters away)
-            let distance = Math.random() * 3 + 3; 
+            // INCREASED DISTANCE: Spawns further away (between 5 and 10 meters)
+            let distance = Math.random() * 5 + 5; 
             
             let newX = Math.cos(angle) * distance;
-            let newY = Math.random() * 2.5 + 0.8; // Random height between 0.8m and 3.3m
+            let newY = Math.random() * 3 + 0.8; // Heights up to 3.8m
             let newZ = Math.sin(angle) * distance;
             
-            // Randomly pick next color: Red or Blue
             let isRed = Math.random() > 0.5;
             let nextColor = isRed ? '#ff0033' : '#0066ff';
             let nextType = isRed ? 'red' : 'blue';
@@ -89,45 +111,38 @@
         </a-assets>
 
         <a-sky color="#050510"></a-sky>
-        <a-plane src="#grid" position="0 0 0" rotation="-90 0 0" width="30" height="30" repeat="15 15"></a-plane>
+        <a-plane src="#grid" position="0 0 0" rotation="-90 0 0" width="40" height="40" repeat="20 20"></a-plane>
 
         <a-light type="ambient" color="#333344"></a-light>
         <a-light type="point" intensity="1.2" position="0 5 0"></a-light>
 
         <a-entity position="0 3.5 -3" 
                   geometry="primitive: plane; width: 2.5; height: 0.8" 
-                  material="color: #111; opacity: 0.8; clothing: true; strokeColor: #444; strokeWidth: 2">
+                  material="color: #111; opacity: 0.8">
             <a-text id="scoreText" value="SCORE: 0" align="center" position="0 0 0.05" color="#00d2ff" width="5" font="mozillavr"></a-text>
         </a-entity>
 
-        <a-box target="colorType: red" position="1.5 1.5 -3" material="color: #ff0033; roughness: 0.2" 
+        <a-box target="colorType: red" position="2 1.5 -5" material="color: #ff0033; roughness: 0.2" 
                animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear"
                class="clickable">
         </a-box>
 
-        <a-box target="colorType: blue" position="-1.5 2 -2.5" material="color: #0066ff; roughness: 0.2" 
+        <a-box target="colorType: blue" position="-2 2 -5.5" material="color: #0066ff; roughness: 0.2" 
                animation="property: rotation; to: -360 360 0; loop: true; dur: 5000; easing: linear"
                class="clickable">
         </a-box>
 
-
         <a-entity id="rig">
             <a-camera position="0 1.6 0">
-                <a-cursor color="#fff" raycaster="objects: .clickable" far="20"></a-cursor>
+                <a-cursor color="#fff" raycaster="objects: .clickable" far="30"></a-cursor>
             </a-camera>
 
             <a-entity id="leftHand" laser-controls="hand: left" raycaster="objects: .clickable; far: 30">
-                <a-box position="0 -0.03 0.05" rotation="-20 0 0" scale="0.025 0.08 0.03" color="#222"></a-box>
-                <a-box position="0 0.01 -0.05" scale="0.03 0.03 0.15" color="#444"></a-box>
-                <a-box position="0 0.026 -0.05" scale="0.01 0.005 0.14" color="#ff0033"></a-box>
-                <a-line start="0 0.01 0" end="0 0.01 -30" color="#ff0033" opacity="0.4"></a-line>
+                <a-line start="0 0 0" end="0 0 -30" color="#ff0033" opacity="0.5"></a-line>
             </a-entity>
 
             <a-entity id="rightHand" laser-controls="hand: right" raycaster="objects: .clickable; far: 30">
-                <a-box position="0 -0.03 0.05" rotation="-20 0 0" scale="0.025 0.08 0.03" color="#222"></a-box>
-                <a-box position="0 0.01 -0.05" scale="0.03 0.03 0.15" color="#444"></a-box>
-                <a-box position="0 0.026 -0.05" scale="0.01 0.005 0.14" color="#0066ff"></a-box>
-                <a-line start="0 0.01 0" end="0 0.01 -30" color="#0066ff" opacity="0.4"></a-line>
+                <a-line start="0 0 0" end="0 0 -30" color="#0066ff" opacity="0.5"></a-line>
             </a-entity>
         </a-entity>
     </a-scene>
