@@ -7,11 +7,10 @@
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
     
     <script>
-        // Web Audio API Setup for Sound Effects (No external files needed)
+        // Web Audio API Setup for Sound Effects
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playSound(type) {
-            // Resume context if suspended (browser security feature)
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
             }
@@ -22,7 +21,6 @@
             gain.connect(audioCtx.destination);
 
             if (type === 'hit') {
-                // Retro laser/zap sound for a correct hit
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(440, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
@@ -31,7 +29,6 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.15);
             } else if (type === 'fail') {
-                // Low buzz sound for a wrong color hit
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(180, audioCtx.currentTime);
                 osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.3);
@@ -61,17 +58,17 @@
                     let isCorrectHit = false;
                     if (data.colorType === 'red' && controllerId === 'leftHand') isCorrectHit = true;
                     if (data.colorType === 'blue' && controllerId === 'rightHand') isCorrectHit = true;
-                    if (!controllerId) isCorrectHit = true; // Desktop fallback
+                    if (!controllerId) isCorrectHit = true; 
 
                     if (isCorrectHit) {
                         currentScore += 1;
                         scoreText.setAttribute('text', 'value', 'SCORE: ' + currentScore);
                         el.setAttribute('material', 'color', '#00ff00');
-                        playSound('hit'); // Play correct hit sound
+                        playSound('hit'); 
                     } else {
                         currentScore = 0;
                         scoreText.setAttribute('text', 'value', 'SCORE: WRONG COLOR!');
-                        playSound('fail'); // Play wrong color buzz sound
+                        playSound('fail'); 
                         setTimeout(() => {
                             scoreText.setAttribute('text', 'value', 'SCORE: 0');
                         }, 1000);
@@ -87,11 +84,10 @@
 
         function respawnTarget(el) {
             let angle = Math.random() * Math.PI * 2;
-            // INCREASED DISTANCE: Spawns further away (between 5 and 10 meters)
             let distance = Math.random() * 5 + 5; 
             
             let newX = Math.cos(angle) * distance;
-            let newY = Math.random() * 3 + 0.8; // Heights up to 3.8m
+            let newY = Math.random() * 3 + 0.8; 
             let newZ = Math.sin(angle) * distance;
             
             let isRed = Math.random() > 0.5;
@@ -137,14 +133,47 @@
                 <a-cursor color="#fff" raycaster="objects: .clickable" far="30"></a-cursor>
             </a-camera>
 
-            <a-entity id="leftHand" laser-controls="hand: left" raycaster="objects: .clickable; far: 30">
-                <a-line start="0 0 0" end="0 0 -30" color="#ff0033" opacity="0.5"></a-line>
+            <a-entity id="leftHand" 
+                      xr-controls="hand: left"
+                      raycaster="objects: .clickable; far: 30; showLine: false" 
+                      cursor="rayOrigin: entity">
+                <a-line start="0 0 0" end="0 0 -30" color="#ff0033" opacity="0.6"></a-line>
             </a-entity>
 
-            <a-entity id="rightHand" laser-controls="hand: right" raycaster="objects: .clickable; far: 30">
-                <a-line start="0 0 0" end="0 0 -30" color="#0066ff" opacity="0.5"></a-line>
+            <a-entity id="rightHand" 
+                      xr-controls="hand: right"
+                      raycaster="objects: .clickable; far: 30; showLine: false" 
+                      cursor="rayOrigin: entity">
+                <a-line start="0 0 0" end="0 0 -30" color="#0066ff" opacity="0.6"></a-line>
             </a-entity>
         </a-entity>
     </a-scene>
+
+    <script>
+        // Custom component to bind to Quest controllers without loading models
+        AFRAME.registerComponent('xr-controls', {
+            schema: {
+                hand: {type: 'string', default: 'left'}
+            },
+            init: function () {
+                let el = this.el;
+                let hand = this.data.hand;
+                
+                // Track standard controller inputs using simple WebXR session tracking
+                el.setAttribute('tracked-controls', {hand: hand, iterate: 'controller'});
+                
+                // Trigger click on target when pulling the index trigger
+                el.addEventListener('triggerdown', function () {
+                    let raycaster = el.components.raycaster;
+                    if (raycaster && raycaster.intersectedEls.length > 0) {
+                        raycaster.intersectedEls[0].emit('click', {
+                            cursorEl: el,
+                            intersection: raycaster.getIntersection(raycaster.intersectedEls[0])
+                        });
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>
